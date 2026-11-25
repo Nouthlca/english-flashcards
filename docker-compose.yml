@@ -4,7 +4,7 @@ services:
     container_name: english-flashcards
     restart: unless-stopped
     ports:
-      - "8085:8000"
+      - "8086:8000"
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
