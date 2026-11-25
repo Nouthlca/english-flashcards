@@ -7,13 +7,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Fiszki EN" />
   <link rel="manifest" href="/static/manifest.json" />
-  <link rel="apple-touch-icon" href="[https://cdn-icons-png.flaticon.com/512/3898/3898082.png](https://cdn-icons-png.flaticon.com/512/3898/3898082.png)" />
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3898/3898082.png" />
   <title>Fiszki EN</title>
-  <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
-  <link rel="stylesheet" href="[https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css](https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css)" />
-  <script src="[https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js](https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js)"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
   <style>
-    body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-bottom: 90px; }
+    .hidden { display: none !important; }
+    .sr-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+    body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-bottom: 90px; margin: 0; }
     .perspective { perspective: 1000px; }
     .flip-card-inner { transition: transform 0.5s; transform-style: preserve-3d; position: relative; }
     .flip-card-inner.flipped { transform: rotateY(180deg); }
@@ -29,7 +31,7 @@
   <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3 flex items-center justify-between">
     <h1 class="text-lg font-bold tracking-tight text-blue-400">Fiszki EN</h1>
     <div class="flex items-center gap-2">
-      <button onclick="toggleAccent()" id="accentBtn" class="text-xs bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-lg text-slate-300">🔊 US</button>
+      <button type="button" onclick="toggleAccent()" id="accentBtn" class="text-xs bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-lg text-slate-300">🔊 US</button>
       <a href="/api/export" class="text-xs bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-lg text-slate-300 hover:bg-slate-700">⬇ Backup</a>
     </div>
   </header>
@@ -38,43 +40,49 @@
 
     <section id="tab-add" class="space-y-4">
       <div class="grid grid-cols-2 gap-2 bg-slate-800/70 p-1 rounded-xl">
-        <button onclick="setAddMode('text')" id="btnModeText" class="py-2 rounded-lg text-sm font-medium bg-blue-600 text-white">✍️ Wpisz tekst</button>
-        <button onclick="setAddMode('photo')" id="btnModePhoto" class="py-2 rounded-lg text-sm font-medium text-slate-300">📷 Zrób zdjęcie</button>
+        <button type="button" onclick="setAddMode('text')" id="btnModeText" class="py-2 rounded-lg text-sm font-medium bg-blue-600 text-white">✍️ Wpisz tekst</button>
+        <button type="button" onclick="setAddMode('photo')" id="btnModePhoto" class="py-2 rounded-lg text-sm font-medium text-slate-300">📷 Ze zdjęcia</button>
       </div>
 
-      <div id="mode-text" class="space-y-3 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60">
+      <form id="mode-text" onsubmit="event.preventDefault(); translateManual();" class="space-y-3 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60">
         <div>
           <label class="text-xs text-slate-400 block mb-1">Słówko lub fraza po angielsku</label>
-          <input id="inputTerm" type="text" placeholder="np. rely on, leverage, take for granted..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500" />
+          <input id="inputTerm" type="search" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="none" placeholder="np. rely on, leverage..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500" />
         </div>
         <div>
           <label class="text-xs text-slate-400 block mb-1">Kontekst / całe zdanie (opcjonalnie)</label>
           <textarea id="inputContext" rows="2" placeholder="Wklej zdanie, w którym to wystąpiło..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"></textarea>
         </div>
-        <button onclick="translateManual()" id="btnTranslateManual" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] py-3 rounded-xl font-semibold text-white transition">Tłumacz z kontekstem</button>
-      </div>
+        <button type="submit" id="btnTranslateManual" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] py-3 rounded-xl font-semibold text-white transition">Tłumacz z kontekstem</button>
+      </form>
 
       <div id="mode-photo" class="hidden space-y-3 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60">
-        <label class="block w-full text-center py-4 border-2 border-dashed border-slate-600 rounded-xl cursor-pointer hover:border-blue-500 transition">
-          <span class="text-sm font-medium text-blue-400">📸 Zrób zdjęcie lub wybierz z galerii</span>
-          <input id="photoInput" type="file" accept="image/*" class="hidden" onchange="loadPhotoForCrop(event)" />
-        </label>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="block text-center py-4 bg-blue-600 hover:bg-blue-500 rounded-xl cursor-pointer transition font-semibold text-sm text-white">
+            📸 Otwórz aparat
+            <input id="cameraInput" type="file" accept="image/*" capture="environment" class="sr-file" onchange="loadPhotoForCrop(event)" />
+          </label>
+          <label class="block text-center py-4 bg-slate-700 hover:bg-slate-600 rounded-xl cursor-pointer transition font-semibold text-sm text-slate-100">
+            🖼️ Z galerii
+            <input id="galleryInput" type="file" accept="image/*" class="sr-file" onchange="loadPhotoForCrop(event)" />
+          </label>
+        </div>
 
         <div id="cropContainer" class="hidden space-y-3">
           <p class="text-xs text-slate-400">Zaznacz ramką tylko ten fragment tekstu, który chcesz zeskanować:</p>
           <div class="max-h-80 overflow-hidden rounded-xl bg-black">
             <img id="cropImage" class="max-w-full" />
           </div>
-          <button onclick="runOcrOnCrop()" id="btnRunOcr" class="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-semibold text-white">🔍 Odczytaj tekst z wycinka</button>
+          <button type="button" onclick="runOcrOnCrop()" id="btnRunOcr" class="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-semibold text-white">🔍 Odczytaj tekst z wycinka</button>
         </div>
 
         <div id="ocrWordsContainer" class="hidden space-y-3">
           <div class="flex items-center justify-between">
             <p class="text-xs text-slate-400">Kliknij słowa, których nie znasz (możesz zaznaczyć kilka):</p>
-            <button onclick="clearWordSelection()" class="text-xs text-slate-400 underline">Wyczyść</button>
+            <button type="button" onclick="clearWordSelection()" class="text-xs text-slate-400 underline">Wyczyść</button>
           </div>
           <div id="ocrChips" class="flex flex-wrap gap-1.5 bg-slate-900 p-3 rounded-xl border border-slate-700 max-h-52 overflow-y-auto"></div>
-          <button onclick="translateSelectedWords()" id="btnTranslateOcr" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-semibold text-white">Tłumacz zaznaczone</button>
+          <button type="button" onclick="translateSelectedWords()" id="btnTranslateOcr" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-semibold text-white">Tłumacz zaznaczone</button>
         </div>
       </div>
 
@@ -83,7 +91,7 @@
           <div>
             <div class="flex items-center gap-2">
               <h2 id="resTerm" class="text-xl font-bold text-white"></h2>
-              <button onclick="speak(currentResult.term)" class="text-blue-400 text-lg">🔊</button>
+              <button type="button" onclick="speak(currentResult.term)" class="text-blue-400 text-lg">🔊</button>
             </div>
             <p id="resTranslation" class="text-lg font-semibold text-emerald-400 mt-0.5"></p>
           </div>
@@ -107,14 +115,14 @@
 
         <div class="pt-2 border-t border-slate-700 flex items-center gap-2">
           <input id="resTag" type="text" placeholder="Tag (np. Praca)" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white" />
-          <button onclick="saveCurrentWord()" id="btnSaveWord" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-xl font-semibold text-white text-sm">💾 Zapisz do bazy</button>
+          <button type="button" onclick="saveCurrentWord()" id="btnSaveWord" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-xl font-semibold text-white text-sm">💾 Zapisz do bazy</button>
         </div>
       </div>
     </section>
 
     <section id="tab-list" class="hidden space-y-3">
       <div class="flex gap-2">
-        <input id="searchInput" oninput="loadWords()" type="text" placeholder="Szukaj słówka lub tłumaczenia..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
+        <input id="searchInput" oninput="loadWords()" type="search" placeholder="Szukaj słówka lub tłumaczenia..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
         <select id="tagFilterList" onchange="loadWords()" class="bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-sm text-white">
           <option value="Wszystkie">Wszystkie</option>
         </select>
@@ -129,8 +137,8 @@
           <option value="Wszystkie">Wszystkie tagi</option>
         </select>
         <div class="flex items-center gap-2">
-          <button onclick="toggleQuizDirection()" id="btnQuizDir" class="text-xs bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-lg text-blue-300">EN → PL</button>
-          <button onclick="toggleOnlyDue()" id="btnOnlyDue" class="text-xs bg-blue-600/30 border border-blue-500/50 px-2.5 py-1.5 rounded-lg text-blue-200">Do powtórki</button>
+          <button type="button" onclick="toggleQuizDirection()" id="btnQuizDir" class="text-xs bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-lg text-blue-300">EN → PL</button>
+          <button type="button" onclick="toggleOnlyDue()" id="btnOnlyDue" class="text-xs bg-blue-600/30 border border-blue-500/50 px-2.5 py-1.5 rounded-lg text-blue-200">Do powtórki</button>
         </div>
       </div>
 
@@ -152,7 +160,7 @@
               <span id="cardTag" class="text-[11px] bg-slate-900 text-slate-400 px-2.5 py-1 rounded-full mb-4"></span>
               <h2 id="cardFrontMain" class="text-2xl font-bold text-white leading-snug"></h2>
               <p id="cardFrontSub" class="text-sm text-slate-400 mt-3 italic"></p>
-              <button onclick="event.stopPropagation(); speakCurrentCard()" id="btnSpeakFront" class="mt-5 bg-slate-900 hover:bg-slate-700 px-4 py-2 rounded-full text-sm text-blue-400">🔊 Posłuchaj</button>
+              <button type="button" onclick="event.stopPropagation(); speakCurrentCard()" id="btnSpeakFront" class="mt-5 bg-slate-900 hover:bg-slate-700 px-4 py-2 rounded-full text-sm text-blue-400">🔊 Posłuchaj</button>
               <p class="text-[11px] text-slate-500 mt-auto pt-4">Dotknij kartę, aby odwrócić</p>
             </div>
 
@@ -160,7 +168,7 @@
               <div>
                 <div class="flex items-center justify-between">
                   <h3 id="cardBackMain" class="text-xl font-bold text-emerald-400"></h3>
-                  <button onclick="event.stopPropagation(); speakCurrentCard()" class="text-blue-400 text-lg">🔊</button>
+                  <button type="button" onclick="event.stopPropagation(); speakCurrentCard()" class="text-blue-400 text-lg">🔊</button>
                 </div>
                 <p id="cardBackTerm" class="text-sm text-slate-300 font-medium mt-0.5"></p>
                 <div id="cardBackOther" class="text-xs text-slate-400 mt-2"></div>
@@ -172,8 +180,8 @@
         </div>
 
         <div class="grid grid-cols-2 gap-3 pt-2">
-          <button onclick="submitReview(false)" class="py-3.5 rounded-2xl bg-rose-600/20 border border-rose-500/40 text-rose-300 font-semibold active:scale-95 transition">❌ Powtórz jeszcze</button>
-          <button onclick="submitReview(true)" class="py-3.5 rounded-2xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-semibold active:scale-95 transition">✅ Umiem</button>
+          <button type="button" onclick="submitReview(false)" class="py-3.5 rounded-2xl bg-rose-600/20 border border-rose-500/40 text-rose-300 font-semibold active:scale-95 transition">❌ Powtórz jeszcze</button>
+          <button type="button" onclick="submitReview(true)" class="py-3.5 rounded-2xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-semibold active:scale-95 transition">✅ Umiem</button>
         </div>
       </div>
     </section>
@@ -182,13 +190,13 @@
 
   <nav class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur border-t border-slate-800 safe-bottom z-30">
     <div class="max-w-lg mx-auto grid grid-cols-3">
-      <button onclick="switchTab('add')" id="nav-add" class="py-3 flex flex-col items-center text-blue-400">
+      <button type="button" onclick="switchTab('add')" id="nav-add" class="py-3 flex flex-col items-center text-blue-400">
         <span class="text-xl">➕</span><span class="text-[11px] font-medium">Dodaj</span>
       </button>
-      <button onclick="switchTab('list')" id="nav-list" class="py-3 flex flex-col items-center text-slate-400">
+      <button type="button" onclick="switchTab('list')" id="nav-list" class="py-3 flex flex-col items-center text-slate-400">
         <span class="text-xl">📚</span><span class="text-[11px] font-medium">Baza</span>
       </button>
-      <button onclick="switchTab('quiz')" id="nav-quiz" class="py-3 flex flex-col items-center text-slate-400">
+      <button type="button" onclick="switchTab('quiz')" id="nav-quiz" class="py-3 flex flex-col items-center text-slate-400">
         <span class="text-xl">🃏</span><span class="text-[11px] font-medium">Fiszki</span>
       </button>
     </div>
@@ -294,6 +302,7 @@
       box.innerHTML = '';
       ocrTokens.forEach((word, idx) => {
         const btn = document.createElement('button');
+        btn.type = 'button';
         btn.textContent = word;
         btn.className = `word-chip px-2.5 py-1 rounded-lg text-sm border border-slate-700 bg-slate-800 text-slate-200 ${selectedIndices.has(idx) ? 'selected' : ''}`;
         btn.onclick = () => {
@@ -321,6 +330,7 @@
       const term = document.getElementById('inputTerm').value.trim();
       const context = document.getElementById('inputContext').value.trim();
       if (!term) return showToast('Wpisz słówko lub frazę');
+      document.getElementById('inputTerm').blur();
       await runTranslation(term, context, 'btnTranslateManual');
     }
 
@@ -448,14 +458,14 @@
             <div>
               <div class="flex items-center gap-2">
                 <span class="font-bold text-white">${w.term}</span>
-                <button onclick="speak('${w.term.replace(/'/g, "\\'")}')" class="text-blue-400 text-sm">🔊</button>
+                <button type="button" onclick="speak('${w.term.replace(/'/g, "\\'")}')" class="text-blue-400 text-sm">🔊</button>
               </div>
               <p class="text-emerald-400 text-sm font-medium">${w.translation}</p>
             </div>
             <div class="flex items-center gap-1.5">
               <span class="text-[10px] bg-slate-900 text-slate-300 px-2 py-0.5 rounded-md">${w.tag}</span>
               <span class="text-[10px] bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded-md">Poz. ${w.box}</span>
-              <button onclick="deleteWord(${w.id})" class="text-slate-500 hover:text-rose-400 text-sm ml-1">🗑️</button>
+              <button type="button" onclick="deleteWord(${w.id})" class="text-slate-500 hover:text-rose-400 text-sm ml-1">🗑️</button>
             </div>
           </div>
           ${w.other_meanings.length ? `<p class="text-xs text-slate-400">Inne: ${w.other_meanings.join(', ')}</p>` : ''}
