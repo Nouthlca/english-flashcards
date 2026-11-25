@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Fiszki EN" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <link rel="apple-touch-icon" href="[https://cdn-icons-png.flaticon.com/512/3898/3898082.png](https://cdn-icons-png.flaticon.com/512/3898/3898082.png)" />
+  <title>Fiszki EN</title>
+  <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+  <link rel="stylesheet" href="[https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css](https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css)" />
+  <script src="[https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js](https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js)"></script>
+  <style>
+    body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-bottom: 90px; }
+    .perspective { perspective: 1000px; }
+    .flip-card-inner { transition: transform 0.5s; transform-style: preserve-3d; position: relative; }
+    .flip-card-inner.flipped { transform: rotateY(180deg); }
+    .flip-face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .flip-back { transform: rotateY(180deg); }
+    .word-chip { transition: all 0.15s; }
+    .word-chip.selected { background: #3b82f6; color: white; border-color: #60a5fa; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 12px); }
+  </style>
+</head>
+<body class="min-h-screen antialiased">
+
+  <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+    <h1 class="text-lg font-bold tracking-tight text-blue-400">Fiszki EN</h1>
+    <div class="flex items-center gap-2">
+      <button onclick="toggleAccent()" id="accentBtn" class="text-xs bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-lg text-slate-300">🔊 US</button>
+      <a href="/api/export" class="text-xs bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-lg text-slate-300 hover:bg-slate-700">⬇ Backup</a>
+    </div>
+  </header>
+
+  <main class="max-w-lg mx-auto p-4">
+
+    <section id="tab-add" class="space-y-4">
+      <div class="grid grid-cols-2 gap-2 bg-slate-800/70 p-1 rounded-xl">
+        <button onclick="setAddMode('text')" id="btnModeText" class="py-2 rounded-lg text-sm font-medium bg-blue-600 text-white">✍️ Wpisz tekst</button>
+        <button onclick="setAddMode('photo')" id="btnModePhoto" class="py-2 rounded-lg text-sm font-medium text-slate-300">📷 Zrób zdjęcie</button>
+      </div>
+
+      <div id="mode-text" class="space-y-3 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60">
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Słówko lub fraza po angielsku</label>
+          <input id="inputTerm" type="text" placeholder="np. rely on, leverage, take for granted..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500" />
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Kontekst / całe zdanie (opcjonalnie)</label>
+          <textarea id="inputContext" rows="2" placeholder="Wklej zdanie, w którym to wystąpiło..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"></textarea>
+        </div>
+        <button onclick="translateManual()" id="btnTranslateManual" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] py-3 rounded-xl font-semibold text-white transition">Tłumacz z kontekstem</button>
+      </div>
+
+      <div id="mode-photo" class="hidden space-y-3 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60">
+        <label class="block w-full text-center py-4 border-2 border-dashed border-slate-600 rounded-xl cursor-pointer hover:border-blue-500 transition">
+          <span class="text-sm font-medium text-blue-400">📸 Zrób zdjęcie lub wybierz z galerii</span>
+          <input id="photoInput" type="file" accept="image/*" class="hidden" onchange="loadPhotoForCrop(event)" />
+        </label>
+
+        <div id="cropContainer" class="hidden space-y-3">
+          <p class="text-xs text-slate-400">Zaznacz ramką tylko ten fragment tekstu, który chcesz zeskanować:</p>
+          <div class="max-h-80 overflow-hidden rounded-xl bg-black">
+            <img id="cropImage" class="max-w-full" />
+          </div>
+          <button onclick="runOcrOnCrop()" id="btnRunOcr" class="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-semibold text-white">🔍 Odczytaj tekst z wycinka</button>
+        </div>
+
+        <div id="ocrWordsContainer" class="hidden space-y-3">
+          <div class="flex items-center justify-between">
+            <p class="text-xs text-slate-400">Kliknij słowa, których nie znasz (możesz zaznaczyć kilka):</p>
+            <button onclick="clearWordSelection()" class="text-xs text-slate-400 underline">Wyczyść</button>
+          </div>
+          <div id="ocrChips" class="flex flex-wrap gap-1.5 bg-slate-900 p-3 rounded-xl border border-slate-700 max-h-52 overflow-y-auto"></div>
+          <button onclick="translateSelectedWords()" id="btnTranslateOcr" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-semibold text-white">Tłumacz zaznaczone</button>
+        </div>
+      </div>
+
+      <div id="resultCard" class="hidden bg-slate-800 p-4 rounded-2xl border border-blue-500/40 space-y-3">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 id="resTerm" class="text-xl font-bold text-white"></h2>
+              <button onclick="speak(currentResult.term)" class="text-blue-400 text-lg">🔊</button>
+            </div>
+            <p id="resTranslation" class="text-lg font-semibold text-emerald-400 mt-0.5"></p>
+          </div>
+          <span id="resModel" class="text-[10px] bg-slate-900 text-slate-400 px-2 py-1 rounded-md"></span>
+        </div>
+
+        <div id="resOtherBox" class="hidden">
+          <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Inne znaczenia</p>
+          <div id="resOther" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <div id="resCollocBox" class="hidden">
+          <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Kolokacje / przyimki</p>
+          <div id="resColloc" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <div id="resExamplesBox" class="hidden">
+          <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Przykłady użycia</p>
+          <ul id="resExamples" class="space-y-1.5 text-sm text-slate-200"></ul>
+        </div>
+
+        <div class="pt-2 border-t border-slate-700 flex items-center gap-2">
+          <input id="resTag" type="text" placeholder="Tag (np. Praca)" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white" />
+          <button onclick="saveCurrentWord()" id="btnSaveWord" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-xl font-semibold text-white text-sm">💾 Zapisz do bazy</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-list" class="hidden space-y-3">
+      <div class="flex gap-2">
+        <input id="searchInput" oninput="loadWords()" type="text" placeholder="Szukaj słówka lub tłumaczenia..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
+        <select id="tagFilterList" onchange="loadWords()" class="bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-sm text-white">
+          <option value="Wszystkie">Wszystkie</option>
+        </select>
+      </div>
+      <div id="wordsCount" class="text-xs text-slate-400"></div>
+      <div id="wordsList" class="space-y-2.5"></div>
+    </section>
+
+    <section id="tab-quiz" class="hidden space-y-4">
+      <div class="flex flex-wrap gap-2 items-center justify-between bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60">
+        <select id="tagFilterQuiz" onchange="loadFlashcards()" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white">
+          <option value="Wszystkie">Wszystkie tagi</option>
+        </select>
+        <div class="flex items-center gap-2">
+          <button onclick="toggleQuizDirection()" id="btnQuizDir" class="text-xs bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-lg text-blue-300">EN → PL</button>
+          <button onclick="toggleOnlyDue()" id="btnOnlyDue" class="text-xs bg-blue-600/30 border border-blue-500/50 px-2.5 py-1.5 rounded-lg text-blue-200">Do powtórki</button>
+        </div>
+      </div>
+
+      <div id="quizEmpty" class="hidden text-center py-12 bg-slate-800/40 rounded-2xl border border-slate-800 space-y-2">
+        <p class="text-2xl">🎉</p>
+        <p class="font-semibold text-white">Brak słówek do powtórki!</p>
+        <p class="text-xs text-slate-400">Przełącz na „Wszystkie” albo dodaj nowe słówka.</p>
+      </div>
+
+      <div id="quizArea" class="hidden space-y-4">
+        <div class="flex justify-between text-xs text-slate-400 px-1">
+          <span id="quizProgress">1 / 10</span>
+          <span id="quizBoxBadge">Poziom 1/5</span>
+        </div>
+
+        <div class="perspective cursor-pointer" onclick="flipCard()">
+          <div id="flipCardInner" class="flip-card-inner min-h-[290px]">
+            <div class="flip-face absolute inset-0 bg-slate-800 border border-slate-700 rounded-3xl p-6 flex flex-col items-center justify-center text-center shadow-xl">
+              <span id="cardTag" class="text-[11px] bg-slate-900 text-slate-400 px-2.5 py-1 rounded-full mb-4"></span>
+              <h2 id="cardFrontMain" class="text-2xl font-bold text-white leading-snug"></h2>
+              <p id="cardFrontSub" class="text-sm text-slate-400 mt-3 italic"></p>
+              <button onclick="event.stopPropagation(); speakCurrentCard()" id="btnSpeakFront" class="mt-5 bg-slate-900 hover:bg-slate-700 px-4 py-2 rounded-full text-sm text-blue-400">🔊 Posłuchaj</button>
+              <p class="text-[11px] text-slate-500 mt-auto pt-4">Dotknij kartę, aby odwrócić</p>
+            </div>
+
+            <div class="flip-face flip-back absolute inset-0 bg-slate-800 border border-blue-500/50 rounded-3xl p-5 flex flex-col justify-between shadow-xl overflow-y-auto">
+              <div>
+                <div class="flex items-center justify-between">
+                  <h3 id="cardBackMain" class="text-xl font-bold text-emerald-400"></h3>
+                  <button onclick="event.stopPropagation(); speakCurrentCard()" class="text-blue-400 text-lg">🔊</button>
+                </div>
+                <p id="cardBackTerm" class="text-sm text-slate-300 font-medium mt-0.5"></p>
+                <div id="cardBackOther" class="text-xs text-slate-400 mt-2"></div>
+                <div id="cardBackColloc" class="text-xs text-blue-300 mt-2"></div>
+                <div id="cardBackExample" class="text-xs text-slate-300 mt-3 bg-slate-900/70 p-2.5 rounded-xl"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <button onclick="submitReview(false)" class="py-3.5 rounded-2xl bg-rose-600/20 border border-rose-500/40 text-rose-300 font-semibold active:scale-95 transition">❌ Powtórz jeszcze</button>
+          <button onclick="submitReview(true)" class="py-3.5 rounded-2xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-semibold active:scale-95 transition">✅ Umiem</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur border-t border-slate-800 safe-bottom z-30">
+    <div class="max-w-lg mx-auto grid grid-cols-3">
+      <button onclick="switchTab('add')" id="nav-add" class="py-3 flex flex-col items-center text-blue-400">
+        <span class="text-xl">➕</span><span class="text-[11px] font-medium">Dodaj</span>
+      </button>
+      <button onclick="switchTab('list')" id="nav-list" class="py-3 flex flex-col items-center text-slate-400">
+        <span class="text-xl">📚</span><span class="text-[11px] font-medium">Baza</span>
+      </button>
+      <button onclick="switchTab('quiz')" id="nav-quiz" class="py-3 flex flex-col items-center text-slate-400">
+        <span class="text-xl">🃏</span><span class="text-[11px] font-medium">Fiszki</span>
+      </button>
+    </div>
+  </nav>
+
+  <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-600 text-white text-xs px-4 py-2 rounded-full shadow-lg hidden z-50"></div>
+
+  <script>
+    let currentAccent = 'en-US';
+    let currentResult = null;
+    let cropper = null;
+    let fullOcrText = '';
+    let selectedIndices = new Set();
+    let ocrTokens = [];
+
+    let flashcards = [];
+    let currentCardIdx = 0;
+    let isFlipped = false;
+    let quizDirection = 'EN_PL';
+    let onlyDue = true;
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2500);
+    }
+
+    function toggleAccent() {
+      currentAccent = currentAccent === 'en-US' ? 'en-GB' : 'en-US';
+      document.getElementById('accentBtn').textContent = currentAccent === 'en-US' ? '🔊 US' : '🔊 UK';
+    }
+
+    function speak(text) {
+      if (!text || !window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = currentAccent;
+      u.rate = 0.95;
+      window.speechSynthesis.speak(u);
+    }
+
+    function switchTab(tab) {
+      ['add', 'list', 'quiz'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
+        document.getElementById(`nav-${t}`).classList.toggle('text-blue-400', t === tab);
+        document.getElementById(`nav-${t}`).classList.toggle('text-slate-400', t !== tab);
+      });
+      if (tab === 'list') loadWords();
+      if (tab === 'quiz') loadFlashcards();
+    }
+
+    function setAddMode(mode) {
+      document.getElementById('mode-text').classList.toggle('hidden', mode !== 'text');
+      document.getElementById('mode-photo').classList.toggle('hidden', mode !== 'photo');
+      document.getElementById('btnModeText').className = mode === 'text' ? 'py-2 rounded-lg text-sm font-medium bg-blue-600 text-white' : 'py-2 rounded-lg text-sm font-medium text-slate-300';
+      document.getElementById('btnModePhoto').className = mode === 'photo' ? 'py-2 rounded-lg text-sm font-medium bg-blue-600 text-white' : 'py-2 rounded-lg text-sm font-medium text-slate-300';
+    }
+
+    function loadPhotoForCrop(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const img = document.getElementById('cropImage');
+      img.src = url;
+      document.getElementById('cropContainer').classList.remove('hidden');
+      document.getElementById('ocrWordsContainer').classList.add('hidden');
+      if (cropper) cropper.destroy();
+      cropper = new Cropper(img, { viewMode: 1, autoCropArea: 0.85, responsive: true });
+    }
+
+    async function runOcrOnCrop() {
+      if (!cropper) return;
+      const btn = document.getElementById('btnRunOcr');
+      btn.disabled = true;
+      btn.textContent = '⏳ Odczytuję tekst...';
+
+      cropper.getCroppedCanvas({ maxWidth: 1600 }).toBlob(async (blob) => {
+        try {
+          const fd = new FormData();
+          fd.append('file', blob, 'crop.jpg');
+          const res = await fetch('/api/ocr', { method: 'POST', body: fd });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || 'Błąd OCR');
+
+          fullOcrText = data.text;
+          ocrTokens = fullOcrText.split(/\s+/).filter(Boolean);
+          selectedIndices.clear();
+          renderOcrChips();
+          document.getElementById('ocrWordsContainer').classList.remove('hidden');
+          showToast(`Odczytano (${data.model})`);
+        } catch (err) {
+          alert('Błąd OCR: ' + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = '🔍 Odczytaj tekst z wycinka';
+        }
+      }, 'image/jpeg', 0.85);
+    }
+
+    function renderOcrChips() {
+      const box = document.getElementById('ocrChips');
+      box.innerHTML = '';
+      ocrTokens.forEach((word, idx) => {
+        const btn = document.createElement('button');
+        btn.textContent = word;
+        btn.className = `word-chip px-2.5 py-1 rounded-lg text-sm border border-slate-700 bg-slate-800 text-slate-200 ${selectedIndices.has(idx) ? 'selected' : ''}`;
+        btn.onclick = () => {
+          if (selectedIndices.has(idx)) selectedIndices.delete(idx);
+          else selectedIndices.add(idx);
+          renderOcrChips();
+        };
+        box.appendChild(btn);
+      });
+    }
+
+    function clearWordSelection() {
+      selectedIndices.clear();
+      renderOcrChips();
+    }
+
+    async function translateSelectedWords() {
+      if (selectedIndices.size === 0) return showToast('Zaznacz przynajmniej jedno słowo!');
+      const sorted = Array.from(selectedIndices).sort((a, b) => a - b);
+      const phrase = sorted.map(i => ocrTokens[i]).join(' ').replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
+      await runTranslation(phrase, fullOcrText, 'btnTranslateOcr');
+    }
+
+    async function translateManual() {
+      const term = document.getElementById('inputTerm').value.trim();
+      const context = document.getElementById('inputContext').value.trim();
+      if (!term) return showToast('Wpisz słówko lub frazę');
+      await runTranslation(term, context, 'btnTranslateManual');
+    }
+
+    async function runTranslation(term, context, btnId) {
+      const btn = document.getElementById(btnId);
+      const origText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '⏳ Tłumaczę...';
+
+      try {
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ term, context })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Błąd tłumaczenia');
+
+        currentResult = { term, context, ...data };
+        renderResultCard();
+      } catch (err) {
+        alert('Błąd: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = origText;
+      }
+    }
+
+    function renderResultCard() {
+      const r = currentResult;
+      document.getElementById('resultCard').classList.remove('hidden');
+      document.getElementById('resTerm').textContent = r.term;
+      document.getElementById('resTranslation').textContent = r.translation;
+      document.getElementById('resModel').textContent = r.model || '';
+      document.getElementById('resTag').value = r.suggested_tag || 'Ogólne';
+
+      const fillPills = (arr, boxId, elId) => {
+        const box = document.getElementById(boxId);
+        const el = document.getElementById(elId);
+        el.innerHTML = '';
+        if (arr && arr.length) {
+          box.classList.remove('hidden');
+          arr.forEach(item => {
+            const s = document.createElement('span');
+            s.className = 'text-xs bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-lg text-slate-200';
+            s.textContent = item;
+            el.appendChild(s);
+          });
+        } else box.classList.add('hidden');
+      };
+
+      fillPills(r.other_meanings, 'resOtherBox', 'resOther');
+      fillPills(r.collocations, 'resCollocBox', 'resColloc');
+
+      const exBox = document.getElementById('resExamplesBox');
+      const exEl = document.getElementById('resExamples');
+      exEl.innerHTML = '';
+      if (r.examples && r.examples.length) {
+        exBox.classList.remove('hidden');
+        r.examples.forEach(ex => {
+          const li = document.createElement('li');
+          li.className = 'bg-slate-900/70 p-2 rounded-lg text-xs';
+          li.textContent = ex;
+          exEl.appendChild(li);
+        });
+      } else exBox.classList.add('hidden');
+
+      const saveBtn = document.getElementById('btnSaveWord');
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Zapisz do bazy';
+    }
+
+    async function saveCurrentWord() {
+      if (!currentResult) return;
+      const btn = document.getElementById('btnSaveWord');
+      btn.disabled = true;
+      try {
+        const payload = {
+          term: currentResult.term,
+          translation: currentResult.translation,
+          context: currentResult.context || '',
+          other_meanings: currentResult.other_meanings || [],
+          collocations: currentResult.collocations || [],
+          examples: currentResult.examples || [],
+          cloze_sentence: currentResult.cloze_sentence || '',
+          tag: document.getElementById('resTag').value.trim() || 'Ogólne'
+        };
+        const res = await fetch('/api/words', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Nie udało się zapisać');
+        btn.textContent = '✅ Zapisano!';
+        showToast('Dodano do bazy słówek');
+      } catch (err) {
+        alert(err.message);
+        btn.disabled = false;
+      }
+    }
+
+    async function loadWords() {
+      const search = document.getElementById('searchInput').value.trim();
+      const tag = document.getElementById('tagFilterList').value;
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (tag && tag !== 'Wszystkie') params.append('tag', tag);
+
+      const res = await fetch(`/api/words?${params.toString()}`);
+      const words = await res.json();
+      document.getElementById('wordsCount').textContent = `Zapisane słówka: ${words.length}`;
+
+      if (!search && tag === 'Wszystkie') {
+        const tags = [...new Set(words.map(w => w.tag).filter(Boolean))];
+        updateTagSelects(tags);
+      }
+
+      const list = document.getElementById('wordsList');
+      list.innerHTML = '';
+      words.forEach(w => {
+        const div = document.createElement('div');
+        div.className = 'bg-slate-800/70 border border-slate-700/70 rounded-2xl p-3.5 space-y-2';
+        div.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-white">${w.term}</span>
+                <button onclick="speak('${w.term.replace(/'/g, "\\'")}')" class="text-blue-400 text-sm">🔊</button>
+              </div>
+              <p class="text-emerald-400 text-sm font-medium">${w.translation}</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] bg-slate-900 text-slate-300 px-2 py-0.5 rounded-md">${w.tag}</span>
+              <span class="text-[10px] bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded-md">Poz. ${w.box}</span>
+              <button onclick="deleteWord(${w.id})" class="text-slate-500 hover:text-rose-400 text-sm ml-1">🗑️</button>
+            </div>
+          </div>
+          ${w.other_meanings.length ? `<p class="text-xs text-slate-400">Inne: ${w.other_meanings.join(', ')}</p>` : ''}
+          ${w.collocations.length ? `<p class="text-xs text-blue-300">Połączenia: ${w.collocations.join(', ')}</p>` : ''}
+          ${w.context ? `<p class="text-xs text-slate-400 italic border-l-2 border-slate-600 pl-2">„${w.context}”</p>` : ''}
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function updateTagSelects(tags) {
+      ['tagFilterList', 'tagFilterQuiz'].forEach(id => {
+        const sel = document.getElementById(id);
+        const current = sel.value;
+        sel.innerHTML = '<option value="Wszystkie">Wszystkie</option>';
+        tags.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t;
+          sel.appendChild(opt);
+        });
+        if (tags.includes(current)) sel.value = current;
+      });
+    }
+
+    async function deleteWord(id) {
+      if (!confirm('Usunąć to słówko z bazy?')) return;
+      await fetch(`/api/words/${id}`, { method: 'DELETE' });
+      loadWords();
+      showToast('Usunięto');
+    }
+
+    function toggleQuizDirection() {
+      quizDirection = quizDirection === 'EN_PL' ? 'PL_EN' : 'EN_PL';
+      document.getElementById('btnQuizDir').textContent = quizDirection === 'EN_PL' ? 'EN → PL' : 'PL → EN (Luka)';
+      renderCurrentCard();
+    }
+
+    function toggleOnlyDue() {
+      onlyDue = !onlyDue;
+      const btn = document.getElementById('btnOnlyDue');
+      btn.textContent = onlyDue ? 'Do powtórki' : 'Wszystkie';
+      btn.className = onlyDue
+        ? 'text-xs bg-blue-600/30 border border-blue-500/50 px-2.5 py-1.5 rounded-lg text-blue-200'
+        : 'text-xs bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-lg text-slate-300';
+      loadFlashcards();
+    }
+
+    async function loadFlashcards() {
+      const tag = document.getElementById('tagFilterQuiz').value;
+      const params = new URLSearchParams({ only_due: onlyDue });
+      if (tag && tag !== 'Wszystkie') params.append('tag', tag);
+
+      const res = await fetch(`/api/flashcards?${params.toString()}`);
+      flashcards = await res.json();
+      currentCardIdx = 0;
+
+      if (!flashcards.length) {
+        document.getElementById('quizEmpty').classList.remove('hidden');
+        document.getElementById('quizArea').classList.add('hidden');
+        return;
+      }
+      document.getElementById('quizEmpty').classList.add('hidden');
+      document.getElementById('quizArea').classList.remove('hidden');
+      renderCurrentCard();
+    }
+
+    function renderCurrentCard() {
+      if (!flashcards.length) return;
+      const card = flashcards[currentCardIdx];
+      isFlipped = false;
+      document.getElementById('flipCardInner').classList.remove('flipped');
+      document.getElementById('quizProgress').textContent = `${currentCardIdx + 1} / ${flashcards.length}`;
+      document.getElementById('quizBoxBadge').textContent = `Poziom ${card.box}/5`;
+      document.getElementById('cardTag').textContent = card.tag || 'Ogólne';
+
+      if (quizDirection === 'EN_PL') {
+        document.getElementById('cardFrontMain').textContent = card.term;
+        document.getElementById('cardFrontSub').textContent = card.context ? `„${card.context}”` : '';
+        document.getElementById('btnSpeakFront').classList.remove('hidden');
+        document.getElementById('cardBackMain').textContent = card.translation;
+        document.getElementById('cardBackTerm').textContent = card.term;
+      } else {
+        document.getElementById('cardFrontMain').textContent = card.translation;
+        document.getElementById('cardFrontSub').textContent = card.cloze_sentence || '';
+        document.getElementById('btnSpeakFront').classList.add('hidden');
+        document.getElementById('cardBackMain').textContent = card.term;
+        document.getElementById('cardBackTerm').textContent = card.translation;
+      }
+
+      document.getElementById('cardBackOther').textContent = card.other_meanings.length ? `Inne: ${card.other_meanings.join(', ')}` : '';
+      document.getElementById('cardBackColloc').textContent = card.collocations.length ? `Kolokacje: ${card.collocations.join(', ')}` : '';
+      document.getElementById('cardBackExample').textContent = card.examples.length ? card.examples[0] : (card.context || '');
+    }
+
+    function flipCard() {
+      isFlipped = !isFlipped;
+      document.getElementById('flipCardInner').classList.toggle('flipped', isFlipped);
+    }
+
+    function speakCurrentCard() {
+      if (!flashcards.length) return;
+      speak(flashcards[currentCardIdx].term);
+    }
+
+    async function submitReview(known) {
+      const card = flashcards[currentCardIdx];
+      await fetch(`/api/flashcards/${card.id}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ known })
+      });
+
+      currentCardIdx++;
+      if (currentCardIdx >= flashcards.length) {
+        showToast('Koniec sesji! Ładuję kolejną...');
+        loadFlashcards();
+      } else {
+        renderCurrentCard();
+      }
+    }
+  </script>
+</body>
+</html>
